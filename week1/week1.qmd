@@ -1,0 +1,260 @@
+---
+title: "Stat 364 Lab 1"
+author: "Diya Patel"
+format: pdf
+---
+
+## Question 2
+
+```{r}
+# create a scatterplot between vehicle weight and horsepower
+plot(mtcars$wt, mtcars$hp, 
+     xlab="vehicle weight (1000 lbs)", ylab="Gross horsepower", 
+     main="Vehicle weight vs horsepower")
+
+# attach mtcars for convenience
+attach(mtcars)
+
+# find median of x-axis(weight)
+median_wt = median(wt)
+abline(v=median_wt, col="dodgerblue", lty=3,lwd=3)
+
+# find median of lower and upper halves of weights (x-axis)
+grp1 = wt<median_wt
+median_wt1 = median(wt[grp1])
+median_wt2 = median(wt[!grp1])
+abline(v=median_wt1, col="green4", lwd=2)
+abline(v=median_wt2, col="green4", lwd=2)
+
+# find median of y-axis
+median_hp = median(hp)
+median_hp1 = median(hp[grp1])
+median_hp2 = median(hp[!grp1])
+abline(h=median_hp1, col="orange", lwd=2)
+abline(h=median_hp2, col="orange", lwd=2)
+
+# identify the points
+points(c(median_wt1, median_wt2), 
+       c(median_hp1, median_hp2), 
+       pch=16, cex=2, col="orchid3")
+
+# compute the slope and intercept
+rise= median_hp2 - median_hp1
+run = median_wt2 - median_wt1
+slope = rise/run
+
+intercept = median_hp1 - (slope*median_wt1)
+abline(intercept, slope, col="red", lwd=3)
+```
+
+-   The equation of the median-median line is y =`r slope`x - `r intercept`.
+
+-   This implies that for every 1000-pound increase in weight of the vehicle, the gross horsepower approximately increases by 75.85 and an intercept of -96.84 implies that the horsepower is -96.84 when the vehical weight is 0 pounds.
+
+-   But it should be noted that practically speaking, vehicle weight cannot be zero and horsepower cannot be negative so this is not to be interepreted literally but the intercept can be thought of as an extrapolation beyond the range of vehicle weight values in the dataset.
+
+## Question 3
+
+```{r}
+# 3a - plot a scatterplot of vehicle speed vs stopping distance
+plot(cars$speed, cars$dist, 
+     xlab="Vehicle speed (mph)", ylab="Stopping distance(ft)", 
+     main = "Vehicle speed vs stopping distance")
+model = lm(data=cars, cars$dist~ cars$speed)
+model$coef
+abline(model, col="skyblue", lwd=3)
+```
+
+-   The equation of the line is y= `r model$coefficients[1]`x + `r model$coefficients[2]`.
+
+-   This implies that for every unit increase in vehicle speed, the stopping distance increases approximately by 3.93 ft.
+
+## Question 5
+
+-   I feel better about the estimate for part 5c over that for part 5d. The reason is as follows.
+
+-   The range of vehicle weight values in the given data is \[1850, 7190\] in lbs. While 3802 lies within the range (interpolation), 1700 (weight for 5d) lies outside this range(extrapolation).
+
+-   The predictions calculated from a regression line are only reliable for the values within the range of the given data.
+
+-   The trend of the regression line may or may not continue beyond the range of observed data values. Hence, extrapolating for values outside that range does not produce reliable results.
+
+## Question 6
+
+```{r}
+# 6a - write a function to generate slope and intercept of a median-median line given x and y values
+med_med_line = function(x, y) {
+  med_x = median(x)
+  grp1 = x < med_x
+
+  x1 = median(x[grp1]);  y1 = median(y[grp1])
+  x2 = median(x[!grp1]); y2 = median(y[!grp1])
+
+  slope = (y2 - y1) / (x2 - x1)
+  intercept = y1 - slope * x1
+  c(intercept = intercept, slope = slope)
+}
+```
+
+Now, we use the function described above for the cars dataframe.
+
+```{r}
+fit_orig = med_med_line(cars$speed, cars$dist)
+fit_orig
+```
+
+The slope for the median-median line came out to be `r fit_orig[["slope"]]` and the intercept comes out to be `r fit_orig[["intercept"]]`.
+
+Next, we sample rows of the original data with replacement and apply median-median function that data.
+
+```{r}
+# run median-median for one sample
+set.seed(1) # for reproducibility
+idx = sample(1:nrow(cars), replace = TRUE) #sample with replacement
+boot_cars = cars[idx, ]
+fit_boot = med_med_line(boot_cars$speed, boot_cars$dist)
+
+fit_orig
+fit_boot
+fit_boot - fit_orig
+```
+
+```{r}
+#| echo: false
+slope_orig = fit_orig[["slope"]]
+slope_boot = fit_boot[["slope"]]
+slope_change = slope_boot - slope_orig
+
+int_orig = fit_orig[["intercept"]]
+int_boot = fit_boot[["intercept"]]
+int_change = int_boot - int_orig
+```
+
+The slope of the original median-median line was `r round(slope_orig, 4)`, while the slope from the bootstrap sample was `r round(slope_boot, 4)`. The change in slope (bootstrap minus original) is `r round(slope_change, 4)`.
+
+The intercept changed from `r round(int_orig, 4)` to `r round(int_boot, 4)`, a change of `r round(int_change, 4)`.
+
+Next, we repeat part c 200 times.
+
+```{r}
+set.seed(1)
+B = 200
+intercepts = numeric(B)
+slopes = numeric(B)
+
+for (i in 1:B) {
+  idx = sample(1:nrow(cars), replace = TRUE)
+  b = cars[idx, ]
+  res = med_med_line(b$speed, b$dist)
+  intercepts[i] = res["intercept"]
+  slopes[i] = res["slope"]
+}
+
+par(mfrow = c(1, 2))
+hist(intercepts, main = "200 bootstrap intercepts", xlab = "Intercept")
+hist(slopes,     main = "200 bootstrap slopes",     xlab = "Slope")
+par(mfrow = c(1, 1))
+
+cat("Standard deviation of intercepts:", sd(intercepts), "\n")
+cat("Standard deviation of slopes:", sd(slopes), "\n")
+```
+
+-   The distribution of the 200 bootstrap intercepts is left-skewed, while the distribution of the 200 bootstrap slopes is right-skewed.
+
+-   This is because the slope and intercept are negatively related: when a resample produces an unusually steep slope, the line pivots and the intercept becomes unusually low. Overall, the median-median line varies noticeably from one sample to the next, since it depends on which data points happen to appear in each resample.
+
+-   Also, as evident from the standard deviation values displayed above, the standard deviation of intercepts is much higher than that of slopes which implies that the values of intercepts are relatively more spread out.
+
+## Question 7
+
+First, we fit a regression line predicting the stopping distance of a car as a function of its speed.
+
+```{r}
+model = lm(data=cars, cars$dist~ cars$speed)
+intercept_orig = model$coefficients[1]
+slope_orig = model$coefficients[2]
+
+cat("Intercept:", intercept_orig, "\n")
+cat("Slope:", slope_orig, "\n")
+```
+
+Now, we sample with replacement from the original data and fit a regression line to that one sample.
+
+```{r}
+set.seed(1)
+idx = sample(1:nrow(cars), replace = TRUE)
+boot_cars = cars[idx, ]
+
+model_boot = lm(dist ~ speed, data = boot_cars)
+int_boot = model_boot$coef[[1]]
+slope_boot = model_boot$coef[[2]]
+
+cat("Bootstrap intercept:", round(int_boot, 2), "\n")
+cat("Bootstrap slope:", round(slope_boot, 2), "\n")
+cat("Change in intercept:", round(int_boot - intercept_orig, 2), "\n")
+cat("Change in slope:", round(slope_boot - slope_orig, 2), "\n")
+```
+
+-   The intercept changed from `r round(intercept_orig, 2)` to `r round(int_boot, 2)`, a change of `r round(int_boot - intercept_orig, 2)` and the slope changed from `` r round(slope_orig, 2) to `r round(slope_boot,2)` `` , a change of `r round(slope_boot - slope_orig, 2)`.
+
+-   The slope for the sample is relatively smaller while its intercept is relatively higher. This is observed because as the data points in the sample change, the computed parameters change too and when the slope decreases, the line becomes flatter.
+
+-   To compensate for this decrease, the intercept increases to keep the line passing through each point as closely as possible or keep the line near the center of the data (near the mean vehicle speed and mean stopping distance).
+
+Next, we repeat part b 200 times
+
+```{r}
+#| fig-width: 6
+#| fig-height: 4
+set.seed(1)
+B = 200
+intercepts = numeric(B)
+slopes = numeric(B)
+
+for (i in 1:B) {
+  idx = sample(1:nrow(cars), replace = TRUE)
+  b = cars[idx, ]
+  m = lm(dist ~ speed, data = b)
+  intercepts[i] = m$coef[[1]]
+  slopes[i] = m$coef[[2]]
+}
+
+par(mfrow = c(1, 2))
+hist(intercepts, main = "200 bootstrap intercepts", xlab = "Intercept")
+hist(slopes, main = "200 bootstrap slopes", xlab = "Slope")
+par(mfrow = c(1, 1))
+
+sd(intercepts); sd(slopes)
+```
+
+-   The histograms for slopes and intercepts of 200 samples are roughly bell-shaped curves and can be assumed to be normally distributed for practical purposes.
+
+-   The standard deviation of intercept is `r sd(intercepts)` and that for slopes is `r sd(slopes)`.
+
+-   This shows that the values of intercepts are more spread out as compared to that of slopes as we move from one sample to the next but the variation is moderate and is centered around the original regression line.
+
+Next, we plot 10 regression lines to observe their variability.
+
+```{r}
+plot(cars$speed, cars$dist, 
+     xlab = "Speed (mph)", ylab = "Stopping distance (ft)",
+     main = "Speed vs stopping distance")
+
+for (i in 1:10) {
+  abline(intercepts[i], slopes[i], col = "gray40", lwd = 1.5)
+}
+
+# optional: original line in red for reference
+abline(intercept_orig, slope_orig, col = "red", lwd = 2.5)
+legend("topleft",
+       legend = c("Original line", "Bootstrap lines"),
+       col = c("red", "gray40"),
+       lwd = c(3, 1),
+       bty = "n")
+```
+
+-   All these lines differ in terms of their slopes and intercepts but they are not parallel. The common thing between these lines is that they try to pass through a region where a major chunk of the data lies.
+
+-   The variability in line placement is not same across the range of x. The lines appear close together in the center near the mean speed value of \~15 mph and they seem to be spread out at the two extremes. The spread of the lines seems to be relatively higher for higher values of speeds (x) , on the right of the plot, as compared to the lower values potentially because, the higher values of stopping distance are more spread out at that end/extreme.
+
+-   This implies that the fit is least reliable in the extremes.
